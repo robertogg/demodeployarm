@@ -1,0 +1,181 @@
+{
+    "$schema": "http://schema.management.azure.com/schemas/2015-01-01/deploymentTemplate.json#",
+    "contentVersion": "1.0.0.0",
+    "parameters": {
+        "WebApplicationDemoServicePlanName": {
+            "type": "string"
+        },
+        "WebApplicationDemoServicePlanLocation": {
+            "type": "string"
+        },
+        "WebApplicationDemoServicePlanSKU": {
+            "type": "string",
+            "allowedValues": [
+                "Free",
+                "Shared",
+                "Basic",
+                "Standard"
+            ],
+            "defaultValue": "Free"
+        },
+        "WebApplicationDemoServicePlanWorkerSize": {
+            "type": "string",
+            "allowedValues": [
+                "0",
+                "1",
+                "2"
+            ],
+            "defaultValue": "0"
+        },
+        "WebApplicationDemoName": {
+            "type": "string"
+        },
+        "WebApplicationDemoDeployPackage": {
+            "type": "string"
+        },
+        "_artifactsLocation": {
+            "type": "string"
+        },
+        "_artifactsLocationSasToken": {
+            "type": "securestring"
+        },
+        "DemoARMSqlServerName": {
+            "type": "string"
+        },
+        "DemoARMSqlServerLocation": {
+            "type": "string"
+        },
+        "DemoARMSqlServerAdminLogin": {
+            "type": "string"
+        },
+        "DemoARMSqlServerAdminLoginPassword": {
+            "type": "securestring"
+        },
+        "ARMDatabaseName": {
+            "type": "string"
+        },
+        "ARMDatabaseCollation": {
+            "type": "string",
+            "defaultValue": "SQL_Latin1_General_CP1_CI_AS"
+        },
+        "ARMDatabaseEdition": {
+            "type": "string",
+            "defaultValue": "Web",
+            "allowedValues": [
+                "Basic",
+                "Business",
+                "Premium",
+                "Standard",
+                "Web"
+            ]
+        }
+    },
+    "variables": {
+    },
+    "resources": [
+        {
+            "name": "[parameters('DemoARMSqlServerName')]",
+            "type": "Microsoft.Sql/servers",
+            "location": "[parameters('DemoARMSqlServerLocation')]",
+            "apiVersion": "2014-04-01-preview",
+            "dependsOn": [ ],
+            "tags": {
+                "displayName": "DemoARMSqlServer"
+            },
+            "properties": {
+                "administratorLogin": "[parameters('DemoARMSqlServerAdminLogin')]",
+                "administratorLoginPassword": "[parameters('DemoARMSqlServerAdminLoginPassword')]"
+            },
+            "resources": [
+                {
+                    "name": "AllowAllWindowsAzureIps",
+                    "type": "firewallrules",
+                    "location": "[parameters('DemoARMSqlServerLocation')]",
+                    "apiVersion": "2014-04-01-preview",
+                    "dependsOn": [
+                        "[concat('Microsoft.Sql/servers/', parameters('DemoARMSqlServerName'))]"
+                    ],
+                    "properties": {
+                        "startIpAddress": "0.0.0.0",
+                        "endIpAddress": "0.0.0.0"
+                    }
+                },
+                {
+                    "name": "[parameters('ARMDatabaseName')]",
+                    "type": "databases",
+                    "location": "[parameters('DemoARMSqlServerLocation')]",
+                    "apiVersion": "2014-04-01-preview",
+                    "dependsOn": [
+                        "[parameters('DemoARMSqlServerName')]"
+                    ],
+                    "tags": {
+                        "displayName": "ARMDatabase"
+                    },
+                    "properties": {
+                        "collation": "[parameters('ARMDatabaseCollation')]",
+                        "edition": "[parameters('ARMDatabaseEdition')]",
+                        "maxSizeBytes": "1073741824"
+                    }
+                }
+            ]
+        },
+        {
+            "name": "[parameters('WebApplicationDemoServicePlanName')]",
+            "type": "Microsoft.Web/serverfarms",
+            "location": "[parameters('WebApplicationDemoServicePlanLocation')]",
+            "apiVersion": "2014-06-01",
+            "dependsOn": [ ],
+            "tags": {
+                "displayName": "WebApplicationDemoServicePlan"
+            },
+            "properties": {
+                "name": "[parameters('WebApplicationDemoServicePlanName')]",
+                "sku": "[parameters('WebApplicationDemoServicePlanSKU')]",
+                "workerSize": "[parameters('WebApplicationDemoServicePlanWorkerSize')]",
+                "numberOfWorkers": 1
+            }
+        },
+        {
+            "name": "[parameters('WebApplicationDemoName')]",
+            "type": "Microsoft.Web/sites",
+            "location": "[parameters('WebApplicationDemoServicePlanLocation')]",
+            "apiVersion": "2014-06-01",
+            "dependsOn": [
+                "[concat('Microsoft.Web/serverfarms/', parameters('WebApplicationDemoServicePlanName'))]"
+            ],
+            "tags": {
+                "[concat('hidden-related:', resourceGroup().id, '/providers/Microsoft.Web/serverfarms/', parameters('WebApplicationDemoServicePlanName'))]": "Resource",
+                "displayName": "WebApplicationDemo"
+            },
+            "properties": {
+                "name": "[parameters('WebApplicationDemoName')]",
+                "serverFarm": "[parameters('WebApplicationDemoServicePlanName')]"
+            },
+            "resources": [
+                {
+                    "name": "MSDeploy",
+                    "type": "extensions",
+                    "location": "[parameters('WebApplicationDemoServicePlanLocation')]",
+                    "apiVersion": "2014-06-01",
+                    "dependsOn": [
+                        "[concat('Microsoft.Web/sites/', parameters('WebApplicationDemoName'))]"
+                    ],
+                    "tags": {
+                        "displayName": "WebApplicationDemoDeploy"
+                    },
+                    "properties": {
+                        "packageUri": "[concat(parameters('_artifactsLocation'), '/', parameters('WebApplicationDemoDeployPackage'), parameters('_artifactsLocationSasToken'))]",
+                        "dbType": "None",
+                        "connectionString": "",
+                        "setParameters": {
+                            "IIS Web Application Name": "[parameters('WebApplicationDemoName')]"
+                        }
+                    }
+                }
+            ]
+        }
+
+    ],
+    "outputs": {
+    }
+}
